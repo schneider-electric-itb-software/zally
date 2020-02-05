@@ -1,4 +1,4 @@
-import de.undercouch.gradle.tasks.download.Download
+
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -9,12 +9,18 @@ buildscript {
         gradlePluginPortal()
         maven("https://repo.spring.io/libs-release")
     }
+
+    extra.apply {
+        // sets the jackson version that spring uses
+        set("jackson.version", "2.10.1")
+    }
 }
 
 plugins {
     val kotlinVersion = "1.3.21"
 
     kotlin("jvm").version(kotlinVersion)
+    kotlin("kapt").version(kotlinVersion)
     kotlin("plugin.jpa").version(kotlinVersion)
     kotlin("plugin.noarg").version(kotlinVersion)
     kotlin("plugin.spring").version(kotlinVersion)
@@ -24,7 +30,6 @@ plugins {
     id("org.springframework.boot") version "2.0.4.RELEASE"
     id("io.spring.dependency-management") version "1.0.7.RELEASE"
     id("com.github.ben-manes.versions") version "0.20.0"
-    id("de.undercouch.download") version "3.4.3"
     id("org.jlleitschuh.gradle.ktlint") version "7.2.1"
     id("org.jetbrains.dokka") version "0.10.0"
     id("maven-publish")
@@ -37,6 +42,7 @@ allprojects {
 
     apply(plugin = "java")
     apply(plugin = "kotlin")
+    apply(plugin = "kotlin-kapt")
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "maven-publish")
@@ -49,8 +55,17 @@ allprojects {
 
     dependencies {
         compile("org.jetbrains.kotlin:kotlin-stdlib")
+    }
 
-        testCompile("junit:junit:4.12")
+    kapt {
+        includeCompileClasspath = false
+    }
+
+    configurations.all {
+        resolutionStrategy {
+            // 1.2.10 disallows jar:file: resources, hopefully fixed in 1.2.14+
+            force("com.github.java-json-tools:json-schema-core:bf09fe87139ac1fde0755194b59130f3b2d63e3a")
+        }
     }
 
     tasks.withType(KotlinCompile::class.java).all {
@@ -110,13 +125,19 @@ allprojects {
     }
 }
 
+dependencyManagement {
+    dependencies {
+        dependency("org.assertj:assertj-core:3.11.0")
+    }
+}
+
 dependencies {
     val springBootVersion = "2.0.4.RELEASE"
     val jadlerVersion = "1.3.0"
 
-    compile(project("zally-rule-api"))
-    compile("com.github.zeitlinger.swagger-parser:swagger-parser:v2.0.14-z4")
-    compile("com.github.java-json-tools:json-schema-validator:2.2.10")
+    compile(project(":zally-core"))
+    compile(project(":zally-ruleset-zalando"))
+    compile(project(":zally-ruleset-zally"))
     compile("org.springframework.boot:spring-boot-starter-web:$springBootVersion")
     compile("org.springframework.boot:spring-boot-starter-undertow:$springBootVersion")
     compile("org.springframework.boot:spring-boot-starter-actuator:$springBootVersion")
@@ -130,43 +151,26 @@ dependencies {
     compile("org.jadira.usertype:usertype.core:7.0.0.CR1") {
         exclude("org.hibernate", "hibernate-entitymanager")
     }
-    compile("com.fasterxml.jackson.module:jackson-module-parameter-names")
-    compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-    compile("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
-    // 2.9+ is invalid for maven publish
-    compile("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.8")
+    compile("com.fasterxml.jackson.module:jackson-module-parameter-names:2.10.2")
+    compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.10.2")
+    compile("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.10.2")
+    compile("com.fasterxml.jackson.module:jackson-module-kotlin:2.10.2")
+    compile("org.yaml:snakeyaml:1.24")
     compile("org.zalando.stups:stups-spring-oauth2-server:1.0.22")
     compile("org.zalando:problem-spring-web:0.23.0")
     compile("org.zalando:twintip-spring-web:1.1.0")
-    compile("io.github.config4k:config4k:0.4.1")
 
-    compile("de.mpg.mpi-inf:javatools:1.1")
-
-    testCompile(project("zally-rule-api"))
-
+    testCompile(project(":zally-test"))
     testCompile("net.jadler:jadler-core:$jadlerVersion")
     testCompile("net.jadler:jadler-jdk:$jadlerVersion")
     testCompile("net.jadler:jadler-junit:$jadlerVersion")
     testCompile("org.springframework.boot:spring-boot-starter-test:$springBootVersion")
-    testCompile("org.assertj:assertj-core:3.11.0")
     testCompile("com.jayway.jsonpath:json-path-assert:2.4.0")
     testCompile("org.mockito:mockito-core:2.23.4")
 }
 
 jacoco {
     toolVersion = "0.8.2"
-}
-
-tasks.register("downloadJsonSchema", Download::class) {
-    src("http://json-schema.org/draft-04/schema")
-    dest("$rootDir/src/main/resources/schemas/json-schema.json")
-    onlyIfModified(true)
-}
-
-tasks.register("downloadSwaggerSchema", Download::class) {
-    src("http://swagger.io/v2/schema.json")
-    dest("$rootDir/src/main/resources/schemas/swagger-schema.json")
-    onlyIfModified(true)
 }
 
 tasks.bootRun {
@@ -186,11 +190,6 @@ tasks.jacocoTestReport {
 tasks.jar {
     archiveBaseName.set(project.name)
     archiveVersion.set(version)
-}
-
-tasks.processResources {
-    dependsOn("downloadJsonSchema")
-    dependsOn("downloadSwaggerSchema")
 }
 
 tasks.wrapper {
