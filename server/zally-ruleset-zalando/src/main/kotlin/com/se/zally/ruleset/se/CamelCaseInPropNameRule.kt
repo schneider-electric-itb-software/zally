@@ -1,13 +1,13 @@
-package de.zalando.zally.rule.schneider
+package com.se.zally.ruleset.se
 
 import com.typesafe.config.Config
-import de.zalando.zally.rule.CaseChecker
+import de.zalando.zally.core.CaseChecker
 import de.zalando.zally.rule.api.Check
 import de.zalando.zally.rule.api.Context
 import de.zalando.zally.rule.api.Rule
 import de.zalando.zally.rule.api.Severity
 import de.zalando.zally.rule.api.Violation
-import de.zalando.zally.rule.zalando.ZalandoRuleSet
+import de.zalando.zally.ruleset.zalando.ZalandoRuleSet
 
 @Rule(
     ruleSet = ZalandoRuleSet::class,
